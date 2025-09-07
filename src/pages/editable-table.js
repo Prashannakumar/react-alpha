@@ -65,9 +65,18 @@ const initialRows = [
 ];
 
 function EditToolbar(props) {
-    const { setRows, setRowModesModel } = props;
+    const {
+        setRows,
+        setRowModesModel,
+        selectedRowId,
+        rowModesModel,
+        handleEditClick,
+        handleDeleteClick,
+        handleSaveClick,
+        handleCancelClick,
+    } = props;
 
-    const handleClick = () => {
+    const handleAddClick = () => {
         const id = randomId();
         setRows((oldRows) => [
             ...oldRows,
@@ -79,12 +88,54 @@ function EditToolbar(props) {
         }));
     };
 
+    const isInEditMode = selectedRowId && rowModesModel[selectedRowId]?.mode === GridRowModes.Edit;
+
     return (
         <Toolbar>
             <Tooltip title="Add record">
-                <ToolbarButton onClick={handleClick}>
+                <ToolbarButton onClick={handleAddClick}>
                     <AddIcon fontSize="small" />
                 </ToolbarButton>
+            </Tooltip>
+            <Tooltip title="Edit">
+                <span>
+                    <ToolbarButton
+                        onClick={selectedRowId ? handleEditClick(selectedRowId) : undefined}
+                        disabled={!selectedRowId || isInEditMode}
+                    >
+                        <EditIcon fontSize="small" />
+                    </ToolbarButton>
+                </span>
+            </Tooltip>
+            <Tooltip title="Delete">
+                <span>
+                    <ToolbarButton
+                        onClick={selectedRowId ? handleDeleteClick(selectedRowId) : undefined}
+                        disabled={!selectedRowId || isInEditMode}
+                    >
+                        <DeleteIcon fontSize="small" />
+                    </ToolbarButton>
+                </span>
+            </Tooltip>
+            <Tooltip title="Save">
+                <span>
+                    <ToolbarButton
+                        onClick={selectedRowId ? handleSaveClick(selectedRowId) : undefined}
+                        disabled={!selectedRowId || !isInEditMode}
+                    >
+                        <SaveIcon fontSize="small" />
+                    </ToolbarButton>
+                </span>
+            </Tooltip>
+            <Tooltip title="Cancel">
+                <span>
+                    <ToolbarButton
+                        onClick={selectedRowId ? handleCancelClick(selectedRowId) : undefined}
+                        disabled={!selectedRowId || !isInEditMode}
+                    >
+                        <CancelIcon fontSize="small" />
+                    </ToolbarButton>
+                </span>
             </Tooltip>
         </Toolbar>
     );
@@ -93,6 +144,7 @@ function EditToolbar(props) {
 export default function EditableTable() {
     const [rows, setRows] = React.useState(initialRows);
     const [rowModesModel, setRowModesModel] = React.useState({});
+    const [selectedRowId, setSelectedRowId] = React.useState(null);
 
     const handleRowEditStop = (params, event) => {
         if (params.reason === GridRowEditStopReasons.rowFocusOut) {
@@ -110,6 +162,7 @@ export default function EditableTable() {
 
     const handleDeleteClick = (id) => () => {
         setRows(rows.filter((row) => row.id !== id));
+        setSelectedRowId(null);
     };
 
     const handleCancelClick = (id) => () => {
@@ -121,6 +174,7 @@ export default function EditableTable() {
         const editedRow = rows.find((row) => row.id === id);
         if (editedRow.isNew) {
             setRows(rows.filter((row) => row.id !== id));
+            setSelectedRowId(null);
         }
     };
 
@@ -160,54 +214,7 @@ export default function EditableTable() {
             type: 'singleSelect',
             valueOptions: ['Market', 'Finance', 'Development'],
         },
-        {
-            field: 'actions',
-            type: 'actions',
-            headerName: 'Actions',
-            width: 100,
-            cellClassName: 'actions',
-            getActions: ({ id }) => {
-                const isInEditMode = rowModesModel[id]?.mode === GridRowModes.Edit;
-
-                if (isInEditMode) {
-                    return [
-                        <GridActionsCellItem
-                            icon={<SaveIcon />}
-                            label="Save"
-                            material={{
-                                sx: {
-                                    color: 'primary.main',
-                                },
-                            }}
-                            onClick={handleSaveClick(id)}
-                        />,
-                        <GridActionsCellItem
-                            icon={<CancelIcon />}
-                            label="Cancel"
-                            className="textPrimary"
-                            onClick={handleCancelClick(id)}
-                            color="inherit"
-                        />,
-                    ];
-                }
-
-                return [
-                    <GridActionsCellItem
-                        icon={<EditIcon />}
-                        label="Edit"
-                        className="textPrimary"
-                        onClick={handleEditClick(id)}
-                        color="inherit"
-                    />,
-                    <GridActionsCellItem
-                        icon={<DeleteIcon />}
-                        label="Delete"
-                        onClick={handleDeleteClick(id)}
-                        color="inherit"
-                    />,
-                ];
-            },
-        },
+        // Removed actions column
     ];
 
     return (
@@ -231,11 +238,30 @@ export default function EditableTable() {
                 onRowModesModelChange={handleRowModesModelChange}
                 onRowEditStop={handleRowEditStop}
                 processRowUpdate={processRowUpdate}
-                slots={{ toolbar: EditToolbar }}
+                slots={{
+                    toolbar: (toolbarProps) => (
+                        <EditToolbar
+                            {...toolbarProps}
+                            setRows={setRows}
+                            setRowModesModel={setRowModesModel}
+                            selectedRowId={selectedRowId}
+                            rowModesModel={rowModesModel}
+                            handleEditClick={handleEditClick}
+                            handleDeleteClick={handleDeleteClick}
+                            handleSaveClick={handleSaveClick}
+                            handleCancelClick={handleCancelClick}
+                        />
+                    ),
+                }}
                 slotProps={{
                     toolbar: { setRows, setRowModesModel },
                 }}
                 showToolbar
+                onRowClick={(params) => setSelectedRowId(params.id)}
+                // Optional: highlight selected row
+                getRowClassName={(params) =>
+                    params.id === selectedRowId ? 'Mui-selected' : ''
+                }
             />
         </Box>
     );
