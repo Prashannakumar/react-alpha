@@ -20,6 +20,7 @@ import {
     randomId,
     randomArrayItem,
 } from '@mui/x-data-grid-generator';
+import Checkbox from '@mui/material/Checkbox';
 
 const roles = ['Market', 'Finance', 'Development'];
 const randomRole = () => {
@@ -189,6 +190,23 @@ export default function EditableTable() {
     };
 
     const columns = [
+        {
+            field: 'select',
+            headerName: '',
+            width: 50,
+            sortable: false,
+            filterable: false,
+            disableColumnMenu: true,
+            renderCell: (params) => (
+                <Checkbox
+                    checked={params.id === selectedRowId}
+                    onChange={() =>
+                        setSelectedRowId(params.id === selectedRowId ? null : params.id)
+                    }
+                    style={{ cursor: 'pointer' }}
+                />
+            ),
+        },
         { field: 'name', headerName: 'Name', width: 180, editable: true },
         {
             field: 'age',
@@ -214,7 +232,6 @@ export default function EditableTable() {
             type: 'singleSelect',
             valueOptions: ['Market', 'Finance', 'Development'],
         },
-        // Removed actions column
     ];
 
     return (
@@ -258,7 +275,6 @@ export default function EditableTable() {
                 }}
                 showToolbar
                 onRowClick={(params) => setSelectedRowId(params.id)}
-                // Optional: highlight selected row
                 getRowClassName={(params) =>
                     params.id === selectedRowId ? 'Mui-selected' : ''
                 }
