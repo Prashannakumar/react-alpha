@@ -4,13 +4,8 @@ import Tooltip from '@mui/material/Tooltip';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/DeleteOutlined';
-import SaveIcon from '@mui/icons-material/Save';
-import CancelIcon from '@mui/icons-material/Close';
 import {
-    GridRowModes,
     DataGrid,
-    GridActionsCellItem,
-    GridRowEditStopReasons,
     Toolbar,
     ToolbarButton,
 } from '@mui/x-data-grid';
@@ -21,11 +16,10 @@ import {
     randomArrayItem,
 } from '@mui/x-data-grid-generator';
 import Checkbox from '@mui/material/Checkbox';
+import RowDialog from './RowDialog';
 
 const roles = ['Market', 'Finance', 'Development'];
-const randomRole = () => {
-    return randomArrayItem(roles);
-};
+const randomRole = () => randomArrayItem(roles);
 
 const initialRows = [
     {
@@ -65,44 +59,19 @@ const initialRows = [
     },
 ];
 
-function EditToolbar(props) {
-    const {
-        setRows,
-        setRowModesModel,
-        selectedRowId,
-        rowModesModel,
-        handleEditClick,
-        handleDeleteClick,
-        handleSaveClick,
-        handleCancelClick,
-    } = props;
-
-    const handleAddClick = () => {
-        const id = randomId();
-        setRows((oldRows) => [
-            ...oldRows,
-            { id, name: '', age: '', role: '', isNew: true },
-        ]);
-        setRowModesModel((oldModel) => ({
-            ...oldModel,
-            [id]: { mode: GridRowModes.Edit, fieldToFocus: 'name' },
-        }));
-    };
-
-    const isInEditMode = selectedRowId && rowModesModel[selectedRowId]?.mode === GridRowModes.Edit;
-
+function EditToolbar({ selectedRowId, handleAddOpen, handleEditOpen, handleDeleteClick }) {
     return (
         <Toolbar>
             <Tooltip title="Add record">
-                <ToolbarButton onClick={handleAddClick}>
+                <ToolbarButton onClick={handleAddOpen}>
                     <AddIcon fontSize="small" />
                 </ToolbarButton>
             </Tooltip>
             <Tooltip title="Edit">
                 <span>
                     <ToolbarButton
-                        onClick={selectedRowId ? handleEditClick(selectedRowId) : undefined}
-                        disabled={!selectedRowId || isInEditMode}
+                        onClick={selectedRowId ? handleEditOpen : undefined}
+                        disabled={!selectedRowId}
                     >
                         <EditIcon fontSize="small" />
                     </ToolbarButton>
@@ -112,29 +81,9 @@ function EditToolbar(props) {
                 <span>
                     <ToolbarButton
                         onClick={selectedRowId ? handleDeleteClick(selectedRowId) : undefined}
-                        disabled={!selectedRowId || isInEditMode}
+                        disabled={!selectedRowId}
                     >
                         <DeleteIcon fontSize="small" />
-                    </ToolbarButton>
-                </span>
-            </Tooltip>
-            <Tooltip title="Save">
-                <span>
-                    <ToolbarButton
-                        onClick={selectedRowId ? handleSaveClick(selectedRowId) : undefined}
-                        disabled={!selectedRowId || !isInEditMode}
-                    >
-                        <SaveIcon fontSize="small" />
-                    </ToolbarButton>
-                </span>
-            </Tooltip>
-            <Tooltip title="Cancel">
-                <span>
-                    <ToolbarButton
-                        onClick={selectedRowId ? handleCancelClick(selectedRowId) : undefined}
-                        disabled={!selectedRowId || !isInEditMode}
-                    >
-                        <CancelIcon fontSize="small" />
                     </ToolbarButton>
                 </span>
             </Tooltip>
@@ -144,49 +93,61 @@ function EditToolbar(props) {
 
 export default function EditableTable() {
     const [rows, setRows] = React.useState(initialRows);
-    const [rowModesModel, setRowModesModel] = React.useState({});
     const [selectedRowId, setSelectedRowId] = React.useState(null);
 
-    const handleRowEditStop = (params, event) => {
-        if (params.reason === GridRowEditStopReasons.rowFocusOut) {
-            event.defaultMuiPrevented = true;
+    // Dialog state
+    const [dialogOpen, setDialogOpen] = React.useState(false);
+    const [dialogMode, setDialogMode] = React.useState('add'); // 'add' or 'edit'
+    const [dialogInitialData, setDialogInitialData] = React.useState(null);
+
+    // Open Add Dialog
+    const handleAddOpen = () => {
+        setDialogMode('add');
+        setDialogInitialData({ name: '', age: '', joinDate: '', role: '' });
+        setDialogOpen(true);
+    };
+
+    // Open Edit Dialog
+    const handleEditOpen = () => {
+        const row = rows.find((r) => r.id === selectedRowId);
+        setDialogMode('edit');
+        setDialogInitialData({
+            name: row.name,
+            age: row.age,
+            joinDate: row.joinDate,
+            role: row.role,
+        });
+        setDialogOpen(true);
+    };
+
+    // Dialog submit handler
+    const handleDialogSubmit = (formData) => {
+        if (dialogMode === 'add') {
+            setRows((oldRows) => [
+                ...oldRows,
+                {
+                    id: randomId(),
+                    ...formData,
+                },
+            ]);
+        } else if (dialogMode === 'edit' && selectedRowId) {
+            setRows((oldRows) =>
+                oldRows.map((row) =>
+                    row.id === selectedRowId ? { ...row, ...formData } : row
+                )
+            );
         }
+        setDialogOpen(false);
     };
 
-    const handleEditClick = (id) => () => {
-        setRowModesModel({ ...rowModesModel, [id]: { mode: GridRowModes.Edit } });
-    };
-
-    const handleSaveClick = (id) => () => {
-        setRowModesModel({ ...rowModesModel, [id]: { mode: GridRowModes.View } });
+    // Dialog close handler
+    const handleDialogClose = () => {
+        setDialogOpen(false);
     };
 
     const handleDeleteClick = (id) => () => {
         setRows(rows.filter((row) => row.id !== id));
         setSelectedRowId(null);
-    };
-
-    const handleCancelClick = (id) => () => {
-        setRowModesModel({
-            ...rowModesModel,
-            [id]: { mode: GridRowModes.View, ignoreModifications: true },
-        });
-
-        const editedRow = rows.find((row) => row.id === id);
-        if (editedRow.isNew) {
-            setRows(rows.filter((row) => row.id !== id));
-            setSelectedRowId(null);
-        }
-    };
-
-    const processRowUpdate = (newRow) => {
-        const updatedRow = { ...newRow, isNew: false };
-        setRows(rows.map((row) => (row.id === newRow.id ? updatedRow : row)));
-        return updatedRow;
-    };
-
-    const handleRowModesModelChange = (newRowModesModel) => {
-        setRowModesModel(newRowModesModel);
     };
 
     const columns = [
@@ -207,7 +168,7 @@ export default function EditableTable() {
                 />
             ),
         },
-        { field: 'name', headerName: 'Name', width: 180, editable: true },
+        { field: 'name', headerName: 'Name', width: 180 },
         {
             field: 'age',
             headerName: 'Age',
@@ -215,22 +176,19 @@ export default function EditableTable() {
             width: 80,
             align: 'left',
             headerAlign: 'left',
-            editable: true,
         },
         {
             field: 'joinDate',
             headerName: 'Join date',
             type: 'date',
             width: 180,
-            editable: true,
         },
         {
             field: 'role',
             headerName: 'Department',
             width: 220,
-            editable: true,
             type: 'singleSelect',
-            valueOptions: ['Market', 'Finance', 'Development'],
+            valueOptions: roles,
         },
     ];
 
@@ -250,34 +208,29 @@ export default function EditableTable() {
             <DataGrid
                 rows={rows}
                 columns={columns}
-                editMode="row"
-                rowModesModel={rowModesModel}
-                onRowModesModelChange={handleRowModesModelChange}
-                onRowEditStop={handleRowEditStop}
-                processRowUpdate={processRowUpdate}
                 slots={{
                     toolbar: (toolbarProps) => (
                         <EditToolbar
                             {...toolbarProps}
-                            setRows={setRows}
-                            setRowModesModel={setRowModesModel}
                             selectedRowId={selectedRowId}
-                            rowModesModel={rowModesModel}
-                            handleEditClick={handleEditClick}
+                            handleAddOpen={handleAddOpen}
+                            handleEditOpen={handleEditOpen}
                             handleDeleteClick={handleDeleteClick}
-                            handleSaveClick={handleSaveClick}
-                            handleCancelClick={handleCancelClick}
                         />
                     ),
-                }}
-                slotProps={{
-                    toolbar: { setRows, setRowModesModel },
                 }}
                 showToolbar
                 onRowClick={(params) => setSelectedRowId(params.id)}
                 getRowClassName={(params) =>
                     params.id === selectedRowId ? 'Mui-selected' : ''
                 }
+            />
+            <RowDialog
+                open={dialogOpen}
+                mode={dialogMode}
+                initialData={dialogInitialData}
+                onClose={handleDialogClose}
+                onSubmit={handleDialogSubmit}
             />
         </Box>
     );
